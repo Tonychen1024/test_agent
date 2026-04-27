@@ -42,6 +42,35 @@
   const TRACKER_SIZE = 20;
   const TRACKER_BASE_SPEED = 85; // px/s — slower than bounce enemies but always chases
 
+  // --- Walls (obstacles) ---
+  // Canvas is 600×400; player starts at (280,180) 24×24.
+  const WALLS = [
+    { x: 140, y:  80, w: 20, h: 120 }, // left vertical barrier
+    { x: 380, y: 180, w: 20, h: 130 }, // right vertical barrier
+    { x: 200, y: 280, w: 160, h: 20 }, // bottom horizontal barrier
+    { x: 320, y:  60, w: 20,  h:  90 }, // top-right short barrier
+  ];
+
+  // AABB overlap test
+  function aabbOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x &&
+           a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // Push obj out of wall on minimum-penetration axis. Returns 'x', 'y', or null.
+  function resolveWall(obj, wall) {
+    if (!aabbOverlap(obj, wall)) return null;
+    const ox = Math.min(obj.x + obj.w - wall.x, wall.x + wall.w - obj.x);
+    const oy = Math.min(obj.y + obj.h - wall.y, wall.y + wall.h - obj.y);
+    if (ox <= oy) {
+      obj.x += (obj.x + obj.w / 2 < wall.x + wall.w / 2) ? -ox : ox;
+      return 'x';
+    } else {
+      obj.y += (obj.y + obj.h / 2 < wall.y + wall.h / 2) ? -oy : oy;
+      return 'y';
+    }
+  }
+
   // --- Game state ---
   let score = 0;
   let gameOver = false;
@@ -184,6 +213,9 @@
       player.x = Math.max(0, Math.min(canvas.width  - player.w, player.x));
       player.y = Math.max(0, Math.min(canvas.height - player.h, player.y));
 
+      // Resolve player vs walls
+      WALLS.forEach(w => resolveWall(player, w));
+
       // Player colour
       if (player.isDashing) {
         player.color = '#ffe033'; // yellow during dash
@@ -195,11 +227,17 @@
       enemies.forEach(e => {
         e.x += e.vx * dt;
         e.y += e.vy * dt;
-        // Bounce off walls
+        // Bounce off canvas walls
         if (e.x < 0) { e.x = 0; e.vx = Math.abs(e.vx); }
         if (e.x + e.w > canvas.width)  { e.x = canvas.width  - e.w; e.vx = -Math.abs(e.vx); }
         if (e.y < 0) { e.y = 0; e.vy = Math.abs(e.vy); }
         if (e.y + e.h > canvas.height) { e.y = canvas.height - e.h; e.vy = -Math.abs(e.vy); }
+        // Bounce off obstacle walls
+        WALLS.forEach(w => {
+          const axis = resolveWall(e, w);
+          if (axis === 'x') e.vx = -e.vx;
+          else if (axis === 'y') e.vy = -e.vy;
+        });
       });
 
       // --- Update trackers (homing) ---
@@ -215,6 +253,8 @@
         // Clamp to canvas
         t.x = Math.max(0, Math.min(canvas.width  - t.w, t.x));
         t.y = Math.max(0, Math.min(canvas.height - t.h, t.y));
+        // Resolve tracker vs obstacle walls
+        WALLS.forEach(w => resolveWall(t, w));
       });
 
       // --- Collision: player vs enemies (AABB) ---
@@ -237,6 +277,12 @@
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw obstacle walls
+    ctx.fillStyle = '#888';
+    WALLS.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
+    ctx.strokeStyle = '#aaa';
+    WALLS.forEach(w => ctx.strokeRect(w.x, w.y, w.w, w.h));
 
     // Draw enemies
     ctx.fillStyle = '#ff4444';
