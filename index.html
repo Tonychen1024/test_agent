@@ -20,15 +20,17 @@
     y: 180,
     w: 24,
     h: 24,
-    speed: 3,
+    speed: 180,         // pixels per second
     color: '#4fc3f7',   // default: light blue
     // dash
     isDashing: false,
     dashCooldown: 0,    // seconds remaining
     DASH_COOLDOWN: 2,   // seconds
-    DASH_SPEED: 14,
+    DASH_SPEED: 840,    // pixels per second during dash (frame-rate independent)
     DASH_DURATION: 0.15 // seconds
   };
+
+  const MAX_DELTA_TIME = 0.05; // cap dt to prevent spiral-of-death on tab refocus
 
   // --- Input state ---
   const keys = {};
@@ -65,7 +67,7 @@
 
   function update(ts) {
     if (!lastTime) lastTime = ts;
-    const dt = Math.min((ts - lastTime) / 1000, 0.05); // seconds, capped
+    const dt = Math.min((ts - lastTime) / 1000, MAX_DELTA_TIME);
     lastTime = ts;
 
     // --- Normal movement direction ---
@@ -77,9 +79,9 @@
     if (keys['ArrowDown']  || keys['s'] || keys['S']) dirY += 1;
 
     if (player.isDashing) {
-      // Dash movement
-      player.x += dashVX;
-      player.y += dashVY;
+      // Dash movement — scaled by dt for frame-rate independence
+      player.x += dashVX * dt;
+      player.y += dashVY * dt;
       dashTimer -= dt;
       if (dashTimer <= 0) {
         player.isDashing = false;
@@ -89,8 +91,8 @@
       // Normal movement
       if (dirX !== 0 || dirY !== 0) {
         const len = Math.sqrt(dirX * dirX + dirY * dirY);
-        player.x += (dirX / len) * player.speed;
-        player.y += (dirY / len) * player.speed;
+        player.x += (dirX / len) * player.speed * dt;
+        player.y += (dirY / len) * player.speed * dt;
       }
       // Tick cooldown
       if (player.dashCooldown > 0) {
