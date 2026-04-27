@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>生存遊戲</title>
+  <style>
+    body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; border: 2px solid #555; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="480" height="480"></canvas>
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // --- 玩家 ---
+  const PLAYER_SIZE = 24;
+  const PLAYER_SPEED = 4;
+
+  // --- 敵人設定 ---
+  const ENEMY_SIZE = 24;
+  const ENEMY_BASE_SPEED = 2;
+  const ENEMY_COUNT = 3;          // 初始敵人數量
+  const SPEED_UP_INTERVAL = 5;   // 每 5 秒提速一次
+  const SPEED_UP_RATE = 0.4;     // 每次提速增加的速度
+
+  // 鍵盤狀態
+  const keys = {};
+  document.addEventListener('keydown', e => { keys[e.key] = true; });
+  document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+  let player, enemies, score, lastSpeedUpTime, enemySpeed, state, animId;
+
+  function randomPos(size) {
+    return {
+      x: Math.random() * (W - size),
+      y: Math.random() * (H - size)
+    };
+  }
+
+  function randomVelocity(speed) {
+    const angle = Math.random() * Math.PI * 2;
+    return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+  }
+
+  function init() {
+    player = { x: W / 2 - PLAYER_SIZE / 2, y: H / 2 - PLAYER_SIZE / 2 };
+    enemySpeed = ENEMY_BASE_SPEED;
+    enemies = [];
+    for (let i = 0; i < ENEMY_COUNT; i++) {
+      const pos = randomPos(ENEMY_SIZE);
+      const vel = randomVelocity(enemySpeed);
+      enemies.push({ ...pos, ...vel });
+    }
+    score = 0;
+    lastSpeedUpTime = 0;
+    state = 'playing';
+  }
+
+  function update(dt) {
+    // 移動玩家
+    if (keys['ArrowLeft']  || keys['a'] || keys['A']) player.x -= PLAYER_SPEED;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += PLAYER_SPEED;
+    if (keys['ArrowUp']    || keys['w'] || keys['W']) player.y -= PLAYER_SPEED;
+    if (keys['ArrowDown']  || keys['s'] || keys['S']) player.y += PLAYER_SPEED;
+
+    // 邊界限制
+    player.x = Math.max(0, Math.min(W - PLAYER_SIZE, player.x));
+    player.y = Math.max(0, Math.min(H - PLAYER_SIZE, player.y));
+
+    // 更新分數（每秒 +1）
+    score += dt;
+
+    // 難度提升
+    lastSpeedUpTime += dt;
+    if (lastSpeedUpTime >= SPEED_UP_INTERVAL) {
+      lastSpeedUpTime -= SPEED_UP_INTERVAL;
+      enemySpeed += SPEED_UP_RATE;
+      // 更新現有敵人速度
+      enemies.forEach(e => {
+        const spd = Math.hypot(e.vx, e.vy);
+        if (spd > 0) {
+          e.vx = (e.vx / spd) * enemySpeed;
+          e.vy = (e.vy / spd) * enemySpeed;
+        }
+      });
+    }
+
+    // 移動敵人（彈牆）
+    enemies.forEach(e => {
+      e.x += e.vx;
+      e.y += e.vy;
+      if (e.x <= 0 || e.x + ENEMY_SIZE >= W) { e.vx *= -1; e.x = Math.max(0, Math.min(W - ENEMY_SIZE, e.x)); }
+      if (e.y <= 0 || e.y + ENEMY_SIZE >= H) { e.vy *= -1; e.y = Math.max(0, Math.min(H - ENEMY_SIZE, e.y)); }
+    });
+
+    // 碰撞偵測
+    for (const e of enemies) {
+      if (
+        player.x < e.x + ENEMY_SIZE &&
+        player.x + PLAYER_SIZE > e.x &&
+        player.y < e.y + ENEMY_SIZE &&
+        player.y + PLAYER_SIZE > e.y
+      ) {
+        state = 'game_over';
+        return;
+      }
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    if (state === 'playing') {
+      // 背景
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+
+      // 玩家
+      ctx.fillStyle = '#00d4ff';
+      ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
+
+      // 敵人
+      ctx.fillStyle = '#ff4444';
+      enemies.forEach(e => ctx.fillRect(e.x, e.y, ENEMY_SIZE, ENEMY_SIZE));
+
+      // 分數
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px monospace';
+      ctx.fillText(`存活時間: ${Math.floor(score)} 秒`, 10, 24);
+
+      // 速度提示
+      ctx.fillStyle = '#aaaaaa';
+      ctx.font = '13px monospace';
+      ctx.fillText(`敵人速度: ${enemySpeed.toFixed(1)}`, 10, 44);
+
+    } else if (state === 'game_over') {
+      // 半透明遮罩
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 40px monospace';
+      ctx.fillText('GAME OVER', W / 2, H / 2 - 50);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(`存活: ${Math.floor(score)} 秒`, W / 2, H / 2);
+
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = '20px monospace';
+      ctx.fillText('按 Enter 或 R 重新開始', W / 2, H / 2 + 50);
+
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // 重新開始監聽
+  document.addEventListener('keydown', e => {
+    if (state === 'game_over' && (e.key === 'Enter' || e.key === 'r' || e.key === 'R')) {
+      cancelAnimationFrame(animId);
+      init();
+      loop(performance.now());
+    }
+  });
+
+  let lastTime = null;
+
+  function loop(timestamp) {
+    if (lastTime === null) lastTime = timestamp;
+    const dt = (timestamp - lastTime) / 1000; // 秒
+    lastTime = timestamp;
+
+    if (state === 'playing') update(dt);
+    draw();
+
+    animId = requestAnimationFrame(loop);
+  }
+
+  init();
+  animId = requestAnimationFrame(loop);
+</script>
+</body>
+</html>
