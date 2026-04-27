@@ -24,7 +24,7 @@
   // --- 敵人設定 ---
   const ENEMY_SIZE = 24;
   const ENEMY_BASE_SPEED = 2;
-  const ENEMY_COUNT = 3;          // 初始敵人數量
+  const ENEMY_COUNT = 3;          // 敵人數量
   const SPEED_UP_INTERVAL = 5;   // 每 5 秒提速一次
   const SPEED_UP_RATE = 0.4;     // 每次提速增加的速度
 
@@ -83,10 +83,8 @@
       // 更新現有敵人速度
       enemies.forEach(e => {
         const spd = Math.hypot(e.vx, e.vy);
-        if (spd > 0) {
-          e.vx = (e.vx / spd) * enemySpeed;
-          e.vy = (e.vy / spd) * enemySpeed;
-        }
+        e.vx = (e.vx / spd) * enemySpeed;
+        e.vy = (e.vy / spd) * enemySpeed;
       });
     }
 
