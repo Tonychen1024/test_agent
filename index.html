@@ -38,6 +38,10 @@
   const ENEMY_SPEED_INCREMENT = 20; // px/s per difficulty step
   const DIFFICULTY_INTERVAL = 5;    // seconds between speed increases
 
+  // --- Tracker constants ---
+  const TRACKER_SIZE = 20;
+  const TRACKER_BASE_SPEED = 85; // px/s — slower than bounce enemies but always chases
+
   // --- Game state ---
   let score = 0;
   let gameOver = false;
@@ -58,6 +62,19 @@
 
   let enemies = initEnemies();
 
+  function makeTracker(x, y) {
+    return { x, y, w: TRACKER_SIZE, h: TRACKER_SIZE };
+  }
+
+  function initTrackers() {
+    return [
+      makeTracker(20,  20),
+      makeTracker(560, 360),
+    ];
+  }
+
+  let trackers = initTrackers();
+
   function resetGame() {
     player.x = 280; player.y = 180;
     player.isDashing = false;
@@ -69,6 +86,7 @@
     difficultyTimer = 0;
     speedBonus = 0;
     enemies = initEnemies();
+    trackers = initTrackers();
   }
 
   // --- Input state ---
@@ -184,10 +202,26 @@
         if (e.y + e.h > canvas.height) { e.y = canvas.height - e.h; e.vy = -Math.abs(e.vy); }
       });
 
+      // --- Update trackers (homing) ---
+      trackers.forEach(t => {
+        const cx = (player.x + player.w / 2) - (t.x + t.w / 2);
+        const cy = (player.y + player.h / 2) - (t.y + t.h / 2);
+        const dist = Math.sqrt(cx * cx + cy * cy);
+        if (dist > 0) {
+          const spd = TRACKER_BASE_SPEED + speedBonus;
+          t.x += (cx / dist) * spd * dt;
+          t.y += (cy / dist) * spd * dt;
+        }
+        // Clamp to canvas
+        t.x = Math.max(0, Math.min(canvas.width  - t.w, t.x));
+        t.y = Math.max(0, Math.min(canvas.height - t.h, t.y));
+      });
+
       // --- Collision: player vs enemies (AABB) ---
       // Dash makes player invincible
       if (!player.isDashing) {
-        for (const e of enemies) {
+        const allEnemies = [...enemies, ...trackers];
+        for (const e of allEnemies) {
           if (player.x < e.x + e.w && player.x + player.w > e.x &&
               player.y < e.y + e.h && player.y + player.h > e.y) {
             gameOver = true;
@@ -207,6 +241,10 @@
     // Draw enemies
     ctx.fillStyle = '#ff4444';
     enemies.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
+
+    // Draw trackers (homing, purple)
+    ctx.fillStyle = '#cc44ff';
+    trackers.forEach(t => ctx.fillRect(t.x, t.y, t.w, t.h));
 
     // Draw player
     ctx.fillStyle = player.color;
