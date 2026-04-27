@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: monospace;
+    }
+    canvas {
+      border: 2px solid #444;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="640" height="480"></canvas>
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // ── Game state ────────────────────────────────────────────────
+  let state = 'menu'; // 'menu' | 'playing' | 'game_over'
+
+  // ── Player ────────────────────────────────────────────────────
+  const PLAYER_SIZE = 32;
+  const PLAYER_SPEED = 4;
+
+  const player = {
+    x: W / 2 - PLAYER_SIZE / 2,
+    y: H / 2 - PLAYER_SIZE / 2,
+    w: PLAYER_SIZE,
+    h: PLAYER_SIZE,
+  };
+
+  function resetPlayer() {
+    player.x = W / 2 - PLAYER_SIZE / 2;
+    player.y = H / 2 - PLAYER_SIZE / 2;
+  }
+
+  // ── Input ─────────────────────────────────────────────────────
+  const keys = {};
+
+  document.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+
+    if (state === 'menu' && (e.code === 'Enter' || e.code === 'Space')) {
+      resetPlayer();
+      state = 'playing';
+    }
+
+    if (state === 'game_over' && (e.code === 'KeyR' || e.code === 'Enter')) {
+      resetPlayer();
+      state = 'playing';
+    }
+
+    // ESC in playing → game over (for testing the state)
+    if (state === 'playing' && e.code === 'Escape') {
+      state = 'game_over';
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+  });
+
+  // ── Update ────────────────────────────────────────────────────
+  function update() {
+    if (state !== 'playing') return;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (keys['ArrowLeft']  || keys['KeyA']) dx -= PLAYER_SPEED;
+    if (keys['ArrowRight'] || keys['KeyD']) dx += PLAYER_SPEED;
+    if (keys['ArrowUp']    || keys['KeyW']) dy -= PLAYER_SPEED;
+    if (keys['ArrowDown']  || keys['KeyS']) dy += PLAYER_SPEED;
+
+    player.x = Math.max(0, Math.min(W - player.w, player.x + dx));
+    player.y = Math.max(0, Math.min(H - player.h, player.y + dy));
+  }
+
+  // ── Draw helpers ──────────────────────────────────────────────
+  function drawText(text, x, y, size, color, align) {
+    ctx.fillStyle = color || '#fff';
+    ctx.font = `${size || 24}px monospace`;
+    ctx.textAlign = align || 'center';
+    ctx.fillText(text, x, y);
+  }
+
+  // ── Draw ──────────────────────────────────────────────────────
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (state === 'menu') {
+      drawText('MY GAME', W / 2, H / 2 - 60, 48, '#e2b96f');
+      drawText('Press  Enter  or  Space  to  Start', W / 2, H / 2 + 10, 20, '#aaa');
+      drawText('Move: Arrow Keys  /  WASD', W / 2, H / 2 + 45, 16, '#666');
+      drawText('ESC → Game Over (for testing)', W / 2, H / 2 + 75, 14, '#444');
+      return;
+    }
+
+    if (state === 'game_over') {
+      drawText('GAME  OVER', W / 2, H / 2 - 40, 48, '#e25454');
+      drawText('Press  Enter  or  R  to  Restart', W / 2, H / 2 + 20, 20, '#aaa');
+      return;
+    }
+
+    // playing
+    // Grid lines (subtle)
+    ctx.strokeStyle = '#22223a';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // Player shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(player.x + 4, player.y + 4, player.w, player.h);
+
+    // Player body
+    ctx.fillStyle = '#4fc3f7';
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    // Player highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(player.x + 4, player.y + 4, player.w / 3, player.h / 4);
+
+    // Player border
+    ctx.strokeStyle = '#0288d1';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(player.x, player.y, player.w, player.h);
+
+    // HUD: coordinates
+    drawText(`x: ${Math.round(player.x)}  y: ${Math.round(player.y)}`, 8, 20, 14, '#4fc3f7', 'left');
+    drawText('ESC = Game Over', W - 8, 20, 14, '#444', 'right');
+  }
+
+  // ── Game loop ─────────────────────────────────────────────────
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+</script>
+</body>
+</html>
